@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YouTube Downloader - Quality Selector</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 550px;
+            width: 100%;
+            background: white;
+            border-radius: 24px;
+            padding: 35px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { font-size: 28px; margin-bottom: 8px; color: #333; text-align: center; }
+        .sub { text-align: center; color: #666; margin-bottom: 25px; font-size: 13px; }
+        input {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 14px;
+            outline: none;
+        }
+        input:focus { border-color: #667eea; }
+        .quality-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+        select {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover { transform: translateY(-2px); }
+        .preview {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 16px;
+            text-align: center;
+        }
+        .preview img { max-width: 100%; border-radius: 12px; }
+        .preview h3 { font-size: 14px; margin: 10px 0; color: #333; }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 12px;
+        }
+        .mobile-tip {
+            margin-top: 20px;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            font-size: 11px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 YouTube Downloader</h1>
+        <div class="sub">Choose quality for faster downloads</div>
+        
+        <input type="text" id="url" placeholder="Paste YouTube URL here" value="https://youtu.be/hyYnjco6dHA">
+        
+        <label class="quality-label">📹 Select Quality</label>
+        <select id="quality">
+            <option value="best">🎬 Best Quality (Largest file)</option>
+            <option value="1080p">📺 1080p Full HD (~200-500MB)</option>
+            <option value="720p">📱 720p HD (~100-200MB)</option>
+            <option value="480p">📱 480p (~50-100MB)</option>
+            <option value="360p">📱 360p (~30-60MB)</option>
+            <option value="audio">🎵 Audio Only (~3-8MB)</option>
+        </select>
+        
+        <button id="downloadBtn">⬇️ Download Video</button>
+        
+        <div class="preview" id="preview">
+            <img src="https://img.youtube.com/vi/hyYnjco6dHA/mqdefault.jpg" alt="Thumbnail">
+            <h3>Coming Soon | Redeemed Quartet | Minus One</h3>
+            <div class="info-row"><span>⏱️ Duration:</span><span>0:43</span></div>
+            <div class="info-row"><span>👤 Uploader:</span><span>TWT Cebu City Youth</span></div>
+        </div>
+        
+        <details class="mobile-tip">
+            <summary>📱 How to save on phone</summary>
+            <p><strong>iPhone:</strong> Tap and hold video → "Save to Files"<br>
+            <strong>Android:</strong> Video saves automatically to Downloads<br>
+            <strong>💡 Tip:</strong> Choose 360p or 480p for faster downloads on mobile!</p>
+        </details>
+    </div>
+
+    <script>
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            const url = document.getElementById('url').value;
+            const quality = document.getElementById('quality').value;
+            alert(`Download would start for:\nURL: ${url}\nQuality: ${quality}\n\n(Your Flask backend handles the actual download)`);
+        });
+    </script>
+</body>
+</html>

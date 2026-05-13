@@ -9,7 +9,6 @@ import threading
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
-# Store progress for each download session
 progress_data = {}
 
 HTML_TEMPLATE = '''
@@ -67,7 +66,6 @@ HTML_TEMPLATE = '''
             background: white;
             cursor: pointer;
         }
-        select:focus { border-color: #667eea; }
         button {
             width: 100%;
             padding: 14px;
@@ -79,10 +77,9 @@ HTML_TEMPLATE = '''
             font-weight: bold;
             cursor: pointer;
             transition: transform 0.2s;
-            margin-top: 5px;
         }
         button:hover { transform: translateY(-2px); }
-        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
         .progress-container {
             margin-top: 20px;
             display: none;
@@ -98,7 +95,6 @@ HTML_TEMPLATE = '''
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             width: 0%;
             height: 100%;
-            border-radius: 20px;
             transition: width 0.3s ease;
             display: flex;
             align-items: center;
@@ -129,23 +125,18 @@ HTML_TEMPLATE = '''
             text-align: center;
         }
         .video-preview.show { display: block; }
-        .video-preview img { max-width: 100%; border-radius: 12px; margin-bottom: 10px; }
-        .video-preview h3 { font-size: 14px; margin: 8px 0; color: #333; }
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-            font-size: 12px;
-        }
-        .mobile-tip {
-            margin-top: 20px;
-            padding: 12px;
-            background: #f8f9fa;
-            border-radius: 12px;
+        .video-preview img { max-width: 100%; border-radius: 12px; }
+        .video-preview h3 { font-size: 14px; margin: 8px 0; }
+        .info-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12px; }
+        .speed-badge {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
             font-size: 11px;
-            color: #666;
+            margin-top: 8px;
+            display: inline-block;
         }
-        .mobile-tip summary { cursor: pointer; font-weight: bold; color: #667eea; margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -157,12 +148,12 @@ HTML_TEMPLATE = '''
         
         <label class="quality-label">📹 Select Quality</label>
         <select id="quality">
-            <option value="best">🎬 Best Quality (Largest file)</option>
+            <option value="best">🎬 Best Quality</option>
             <option value="1080p">📺 1080p Full HD</option>
             <option value="720p">📱 720p HD</option>
             <option value="480p">📱 480p</option>
             <option value="360p">📱 360p (Fastest)</option>
-            <option value="audio">🎵 Audio Only (MP3)</option>
+            <option value="audio">🎵 Audio Only</option>
         </select>
         
         <button id="downloadBtn">⬇️ Download Video</button>
@@ -171,18 +162,11 @@ HTML_TEMPLATE = '''
             <div class="progress-bar-wrapper">
                 <div id="progressFill" class="progress-fill">0%</div>
             </div>
-            <div id="progressText" class="progress-text">Starting download...</div>
+            <div id="progressText" class="progress-text">Initializing...</div>
         </div>
         
         <div id="status" class="status"></div>
         <div id="videoPreview" class="video-preview"></div>
-        
-        <details class="mobile-tip">
-            <summary>📱 How to save on phone</summary>
-            <p><strong>iPhone:</strong> Tap and hold video → "Save to Files"<br>
-            <strong>Android:</strong> Video saves automatically to Downloads<br>
-            <strong>💡 Tip:</strong> Choose 360p for faster downloads on mobile data!</p>
-        </details>
     </div>
 
     <script>
@@ -205,7 +189,7 @@ HTML_TEMPLATE = '''
                     statusDiv.className = 'status';
                     statusDiv.textContent = '';
                 }
-            }, 5000);
+            }, 4000);
         }
         
         function updateProgress(percentage, statusMsg) {
@@ -217,25 +201,19 @@ HTML_TEMPLATE = '''
         
         function startProgressMonitoring(sessionId) {
             if (progressInterval) clearInterval(progressInterval);
-            
             progressInterval = setInterval(async () => {
                 try {
                     const response = await fetch(`/progress/${sessionId}`);
                     const data = await response.json();
-                    
                     if (data.percentage >= 100) {
-                        updateProgress(100, 'Complete! Processing file...');
-                        setTimeout(() => {
-                            progressContainer.classList.remove('show');
-                        }, 1500);
+                        updateProgress(100, 'Complete! Processing...');
+                        setTimeout(() => progressContainer.classList.remove('show'), 1000);
                         if (progressInterval) clearInterval(progressInterval);
                     } else if (data.percentage > 0) {
                         updateProgress(data.percentage, data.status || 'Downloading...');
                     }
-                } catch (e) {
-                    console.log('Progress check failed');
-                }
-            }, 1000);
+                } catch (e) {}
+            }, 800);
         }
         
         async function fetchVideoInfo(url) {
@@ -245,42 +223,36 @@ HTML_TEMPLATE = '''
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url: url })
                 });
-                
                 if (response.ok) {
                     const info = await response.json();
                     const videoId = url.split('v=')[1]?.split('&')[0] || url.split('youtu.be/')[1]?.split('?')[0];
                     videoPreview.innerHTML = `
-                        <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg" alt="Thumbnail">
-                        <h3>${escapeHtml(info.title.substring(0, 60))}${info.title.length > 60 ? '...' : ''}</h3>
+                        <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg">
+                        <h3>${escapeHtml(info.title.substring(0, 50))}</h3>
                         <div class="info-row"><span>⏱️ Duration:</span><span>${Math.floor(info.duration/60)}:${(info.duration%60).toString().padStart(2,'0')}</span></div>
                         <div class="info-row"><span>👤 Uploader:</span><span>${escapeHtml(info.uploader)}</span></div>
                     `;
                     videoPreview.classList.add('show');
                 }
-            } catch (e) {
-                console.log('Could not fetch video info');
-            }
+            } catch (e) {}
         }
         
         downloadBtn.addEventListener('click', async () => {
             const url = urlInput.value.trim();
             const quality = qualitySelect.value;
-            
-            if (!url) {
-                showStatus('Please enter a YouTube URL', 'error');
-                return;
-            }
+            if (!url) { showStatus('Please enter a YouTube URL', 'error'); return; }
             
             progressContainer.classList.remove('show');
             if (progressInterval) clearInterval(progressInterval);
             updateProgress(0, 'Starting...');
-            
             downloadBtn.disabled = true;
             showStatus('⏳ Starting download...', 'loading');
             
             const sessionId = Date.now().toString();
             startProgressMonitoring(sessionId);
             progressContainer.classList.add('show');
+            
+            const startTime = Date.now();
             
             try {
                 const response = await fetch('/download', {
@@ -289,9 +261,9 @@ HTML_TEMPLATE = '''
                     body: JSON.stringify({ url: url, quality: quality, sessionId: sessionId })
                 });
                 
-                if (!response.ok) {
-                    throw new Error('Download failed');
-                }
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                
+                if (!response.ok) throw new Error('Download failed');
                 
                 const blob = await response.blob();
                 const a = document.createElement('a');
@@ -300,13 +272,13 @@ HTML_TEMPLATE = '''
                 a.click();
                 URL.revokeObjectURL(a.href);
                 
-                showStatus('✅ Download complete!', 'success');
+                showStatus(`✅ Complete! (${elapsed}s)`, 'success');
             } catch (error) {
                 showStatus('❌ Download failed. Make sure the video is public.', 'error');
                 progressContainer.classList.remove('show');
             } finally {
                 downloadBtn.disabled = false;
-                if (progressInterval) setTimeout(() => clearInterval(progressInterval), 3000);
+                if (progressInterval) setTimeout(() => clearInterval(progressInterval), 2000);
             }
         });
         
@@ -317,7 +289,6 @@ HTML_TEMPLATE = '''
             return div.innerHTML;
         }
         
-        // Fetch info when URL changes
         let debounceTimer;
         urlInput.addEventListener('input', () => {
             clearTimeout(debounceTimer);
@@ -331,10 +302,7 @@ HTML_TEMPLATE = '''
             }, 500);
         });
         
-        // Load info for default URL
-        setTimeout(() => {
-            fetchVideoInfo(urlInput.value.trim());
-        }, 500);
+        setTimeout(() => fetchVideoInfo(urlInput.value.trim()), 500);
     </script>
 </body>
 </html>
@@ -347,7 +315,7 @@ def parse_progress(line, session_id):
         if session_id not in progress_data:
             progress_data[session_id] = {}
         progress_data[session_id]['percentage'] = percent
-        progress_data[session_id]['status'] = f'Downloading... {percent:.1f}%'
+        progress_data[session_id]['status'] = f'{percent:.1f}%'
 
 @app.route('/')
 def index():
@@ -357,15 +325,15 @@ def index():
 def video_info():
     data = request.get_json()
     url = data.get('url')
-    
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
     
-    cmd = f'yt-dlp --dump-json "{url}"'
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    # Faster info fetch with --no-playlist and --quiet
+    cmd = f'yt-dlp --no-playlist --quiet --dump-json "{url}"'
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
     
     if result.returncode != 0:
-        return jsonify({'error': 'Failed to get info'}), 500
+        return jsonify({'error': 'Failed'}), 500
     
     try:
         info = json.loads(result.stdout)
@@ -379,7 +347,7 @@ def video_info():
 
 @app.route('/progress/<session_id>')
 def get_progress(session_id):
-    data = progress_data.get(session_id, {'percentage': 0, 'status': 'Waiting...'})
+    data = progress_data.get(session_id, {'percentage': 0, 'status': 'Starting...'})
     return jsonify({
         'percentage': data.get('percentage', 0),
         'status': data.get('status', 'Downloading...')
@@ -399,18 +367,20 @@ def download():
     
     progress_data[session_id] = {'percentage': 0, 'status': 'Starting...'}
     
+    # Simplified format selectors for faster start
     quality_map = {
-        'best': 'bestvideo+bestaudio/best',
-        '1080p': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
-        '720p': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
-        '480p': 'bestvideo[height<=480]+bestaudio/best[height<=480]',
-        '360p': 'bestvideo[height<=360]+bestaudio/best[height<=360]',
-        'audio': 'bestaudio/best'
+        'best': 'best[ext=mp4]/best',
+        '1080p': 'best[height<=1080][ext=mp4]/best[height<=1080]',
+        '720p': 'best[height<=720][ext=mp4]/best[height<=720]',
+        '480p': 'best[height<=480][ext=mp4]/best[height<=480]',
+        '360p': 'best[height<=360][ext=mp4]/best[height<=360]',
+        'audio': 'bestaudio[ext=m4a]/bestaudio'
     }
     
-    format_spec = quality_map.get(quality, 'bestvideo+bestaudio/best')
+    format_spec = quality_map.get(quality, 'best[ext=mp4]/best')
     
-    cmd = f'cd downloads && yt-dlp -f "{format_spec}" --merge-output-format mp4 --progress "{url}"'
+    # Optimized command: --no-playlist --quiet --no-warnings for faster start
+    cmd = f'cd downloads && yt-dlp --no-playlist --quiet --no-warnings -f "{format_spec}" --progress "{url}"'
     
     process = subprocess.Popen(
         cmd,
@@ -430,10 +400,10 @@ def download():
         return 'Download failed', 500
     
     files = os.listdir('downloads')
-    video_files = [f for f in files if f.endswith(('.mp4', '.mkv', '.mp3'))]
+    video_files = [f for f in files if f.endswith(('.mp4', '.mkv', '.m4a', '.mp3'))]
     
     if not video_files:
-        return 'No video file found', 500
+        return 'No file found', 500
     
     video_files.sort(key=lambda x: os.path.getctime(os.path.join('downloads', x)), reverse=True)
     file_path = os.path.join('downloads', video_files[0])
@@ -444,5 +414,5 @@ def download():
     return send_file(file_path, as_attachment=True)
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port, threaded=True)

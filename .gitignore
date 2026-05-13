@@ -1,4 +1,19 @@
-node_modules/
-downloads/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Downloads (videos are stored separately)
+downloads/*.mp4
+downloads/*.mkv
+downloads/*.webm
+
+# Environment
+venv/
+.env
+
+# Mac
 .DS_Store
+
+# Logs
 *.log
