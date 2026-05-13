@@ -1,50 +1,19 @@
 const express = require('express');
-const ytdl = require('@distube/ytdl-core');
-const cors = require('cors');
-const fs = require('fs');
+const { exec } = require('child_process');
 const path = require('path');
+const fs = require('fs');
+const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Create downloads folder
 const downloadsDir = path.join(__dirname, 'downloads');
 if (!fs.existsSync(downloadsDir)) fs.mkdirSync(downloadsDir);
 
-console.log('✅ Server starting with ytdl-core...');
-
-// Health check
-app.get('/health', (req, res) => {
-    res.status(200).send('OK');
-});
-
-// Get video info
-app.post('/info', async (req, res) => {
-    const { url } = req.body;
-    
-    if (!url) {
-        return res.status(400).json({ error: 'No URL provided' });
-    }
-    
-    try {
-        const info = await ytdl.getInfo(url);
-        res.json({
-            title: info.videoDetails.title,
-            thumbnail: info.videoDetails.thumbnails[0].url,
-            duration: info.videoDetails.lengthSeconds,
-            uploader: info.videoDetails.author.name
-        });
-    } catch (error) {
-        console.error('Info error:', error);
-        res.status(500).json({ error: 'Failed to get video info' });
-    }
-});
-
-// Download video
 app.post('/download', async (req, res) => {
     const { url } = req.body;
     
@@ -52,30 +21,30 @@ app.post('/download', async (req, res) => {
         return res.status(400).json({ error: 'No URL provided' });
     }
     
-    try {
-        const info = await ytdl.getInfo(url);
-        const title = info.videoDetails.title.replace(/[^\w\s]/gi, '');
+    console.log(`📥 Downloading: ${url}`);
+    
+    const command = `cd "${downloadsDir}" && yt-dlp -f "bestvideo+bestaudio" --merge-output-format mp4 "${url}"`;
+    
+    exec(command, { maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error: ${error.message}`);
+            return res.status(500).json({ error: 'Download failed' });
+        }
         
-        res.header('Content-Disposition', `attachment; filename="${title}.mp4"`);
-        res.header('Content-Type', 'video/mp4');
-        
-        // Download the best quality video (with audio when possible)
-        const stream = ytdl(url, { quality: 'highest' });
-        stream.pipe(res);
-        
-        stream.on('error', (err) => {
-            console.error('Stream error:', err);
-            if (!res.headersSent) {
-                res.status(500).json({ error: 'Download failed' });
-            }
+        fs.readdir(downloadsDir, (err, files) => {
+            if (err) return res.status(500).json({ error: 'Error finding file' });
+            
+            const videoFile = files.find(f => f.endsWith('.mp4') || f.endsWith('.mkv'));
+            if (!videoFile) return res.status(500).json({ error: 'No video file found' });
+            
+            const filePath = path.join(downloadsDir, videoFile);
+            res.download(filePath, videoFile, (err) => {
+                setTimeout(() => fs.unlink(filePath, () => {}), 60000);
+            });
         });
-        
-    } catch (error) {
-        console.error('Download error:', error);
-        res.status(500).json({ error: 'Download failed: ' + error.message });
-    }
+    });
 });
 
 app.listen(PORT, () => {
-    console.log(`✅ YouTube Downloader running on port ${PORT}`);
+    console.log(`✅ Server running at http://localhost:${PORT}`);
 });

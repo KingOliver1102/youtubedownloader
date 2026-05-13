@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: youtube-downloader
+    runtime: python
+    repo: https://github.com/KingOliver1102/youtubedownloader
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
