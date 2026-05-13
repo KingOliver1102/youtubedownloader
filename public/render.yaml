@@ -1,0 +1,16 @@
+# render.yaml
+services:
+  - type: web
+    name: youtube-downloader
+    runtime: image
+    repo: https://github.com/yourusername/youtube-downloader
+    plan: free
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+    dockerCommand: |
+      apt-get update && apt-get install -y python3 python3-pip ffmpeg
+      pip3 install yt-dlp
+      node server.js
+    healthCheckPath: /
+    autoDeploy: true

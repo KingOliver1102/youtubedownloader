@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader - Your App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .url-input {
+            flex: 1;
+            padding: 14px;
+            font-size: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .url-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .download-btn {
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .download-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .preview {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 20px;
+            margin: 20px 0;
+            display: none;
+            text-align: center;
+        }
+
+        .preview.active {
+            display: block;
+        }
+
+        .preview img {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .preview h3 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .preview p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 12px;
+            display: none;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .status.loading {
+            background: #e3f2fd;
+            color: #1565c0;
+            display: block;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            margin-top: 15px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-bar.active {
+            display: block;
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .footer {
+            padding: 20px;
+            text-align: center;
+            background: #f8f9fa;
+            font-size: 12px;
+            color: #999;
+        }
+
+        .clear-btn {
+            background: #6c757d;
+            margin-top: 10px;
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .input-group {
+                flex-direction: column;
+            }
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 YouTube Downloader</h1>
+            <p>Your personal video downloader • Just paste and click</p>
+        </div>
+
+        <div class="content">
+            <div class="input-group">
+                <input type="text" id="urlInput" class="url-input" placeholder="Paste YouTube URL here...">
+                <button id="downloadBtn" class="download-btn">⬇️ Download</button>
+            </div>
+
+            <div id="preview" class="preview"></div>
+            <div id="status" class="status"></div>
+            <div id="progressBar" class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            ✅ Works with any public YouTube video • Downloads best quality • Your own private app
+        </div>
+    </div>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const previewDiv = document.getElementById('preview');
+        const statusDiv = document.getElementById('status');
+        const progressBar = document.getElementById('progressBar');
+
+        let isDownloading = false;
+        let currentUrl = '';
+
+        function showStatus(message, type) {
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            if (type !== 'loading') {
+                setTimeout(() => {
+                    if (statusDiv.textContent === message) {
+                        statusDiv.className = 'status';
+                        statusDiv.textContent = '';
+                    }
+                }, 5000);
+            }
+        }
+
+        function showLoading() {
+            showStatus('Processing your request...', 'loading');
+            progressBar.classList.add('active');
+            downloadBtn.disabled = true;
+        }
+
+        function hideLoading() {
+            progressBar.classList.remove('active');
+            downloadBtn.disabled = false;
+        }
+
+        async function getVideoInfo(url) {
+            try {
+                console.log('Fetching info for:', url);
+                const response = await fetch('/info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Video info received:', data.title);
+                    return data;
+                } else {
+                    console.log('Info fetch failed:', response.status);
+                }
+            } catch (e) {
+                console.log('Could not fetch video info:', e);
+            }
+            return null;
+        }
+
+        function displayPreview(info) {
+            const duration = info.duration ? `${Math.floor(info.duration / 60)}:${(info.duration % 60).toString().padStart(2, '0')}` : 'Unknown';
+            previewDiv.innerHTML = `
+                <img src="${info.thumbnail}" alt="Video thumbnail" onerror="this.style.display='none'">
+                <h3>${escapeHtml(info.title)}</h3>
+                <p>👤 ${escapeHtml(info.uploader)} • ⏱️ ${duration}</p>
+            `;
+            previewDiv.classList.add('active');
+        }
+
+        async function downloadVideo(url) {
+            try {
+                console.log('Downloading:', url);
+                const response = await fetch('/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Download failed:', errorText);
+                    throw new Error(`Download failed: ${response.status}`);
+                }
+
+                // Get the file from response
+                const blob = await response.blob();
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'video.mp4';
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="(.+)"/);
+                    if (match) filename = match[1];
+                }
+
+                // Create download link
+                const downloadUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(downloadUrl);
+
+                showStatus('✅ Download complete! Check your Downloads folder.', 'success');
+                return true;
+            } catch (error) {
+                console.error('Download error:', error);
+                showStatus(`❌ Download failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // When URL input changes (user pastes a new URL)
+        urlInput.addEventListener('change', async () => {
+            const url = urlInput.value.trim();
+            if (!url) {
+                previewDiv.classList.remove('active');
+                return;
+            }
+
+            currentUrl = url;
+            showStatus('Loading video info...', 'loading');
+            const info = await getVideoInfo(url);
+            if (info && info.title) {
+                displayPreview(info);
+                showStatus('Ready to download!', 'success');
+            } else {
+                previewDiv.classList.remove('active');
+                showStatus('Could not load preview, but you can still try downloading', 'error');
+            }
+        });
+
+        // Also listen for input events to clear preview when typing
+        urlInput.addEventListener('input', () => {
+            if (previewDiv.classList.contains('active')) {
+                previewDiv.classList.remove('active');
+            }
+        });
+
+        downloadBtn.addEventListener('click', async () => {
+            if (isDownloading) return;
+            
+            const url = urlInput.value.trim();
+            if (!url) {
+                showStatus('Please enter a YouTube URL', 'error');
+                return;
+            }
+
+            // Make sure we're using the current URL from input
+            const urlToDownload = url;
+            console.log('Download button clicked for URL:', urlToDownload);
+
+            isDownloading = true;
+            showLoading();
+            
+            const success = await downloadVideo(urlToDownload);
+            
+            hideLoading();
+            isDownloading = false;
+        });
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Clear any default value - make input empty initially
+        urlInput.value = '';
+        
+        // Add placeholder example
+        urlInput.placeholder = "https://youtu.be/hyYnjco6dHA or https://www.youtube.com/watch?v=...";
+    </script>
+</body>
+</html>
