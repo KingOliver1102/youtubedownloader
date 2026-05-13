@@ -1,15 +1,21 @@
 FROM node:18-slim
 
-# Install Python, pip, ffmpeg, and other dependencies
+# Install Python, pip, ffmpeg, and build dependencies
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
+    python3-venv \
     ffmpeg \
     wget \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp directly
-RUN pip3 install yt-dlp --upgrade --no-cache-dir
+# Upgrade pip and install yt-dlp globally
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install yt-dlp --upgrade
+
+# Verify installation
+RUN python3 -m yt_dlp --version
 
 # Set working directory
 WORKDIR /app
