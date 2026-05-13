@@ -1,15 +1,15 @@
-# Dockerfile
 FROM node:18-slim
 
-# Install Python, pip, ffmpeg, and yt-dlp
+# Install Python, pip, ffmpeg, and other dependencies
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     ffmpeg \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp
-RUN pip3 install yt-dlp --break-system-packages || pip3 install yt-dlp
+# Install yt-dlp directly
+RUN pip3 install yt-dlp --upgrade --no-cache-dir
 
 # Set working directory
 WORKDIR /app
