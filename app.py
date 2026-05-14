@@ -9,6 +9,7 @@ import threading
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
+# Store progress for each download session
 progress_data = {}
 
 HTML_TEMPLATE = '''
@@ -32,63 +33,96 @@ HTML_TEMPLATE = '''
             max-width: 600px;
             width: 100%;
             background: white;
-            border-radius: 24px;
+            border-radius: 28px;
             padding: 35px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
         }
-        h1 { font-size: 28px; margin-bottom: 8px; color: #333; text-align: center; }
+        h1 { font-size: 28px; margin-bottom: 6px; color: #333; text-align: center; }
         .sub { text-align: center; color: #666; margin-bottom: 25px; font-size: 13px; }
+        
         input {
             width: 100%;
-            padding: 14px;
+            padding: 14px 16px;
             margin-bottom: 15px;
             border: 2px solid #e0e0e0;
-            border-radius: 12px;
+            border-radius: 14px;
             font-size: 14px;
             outline: none;
-            box-sizing: border-box;
+            transition: all 0.2s;
         }
         input:focus { border-color: #667eea; }
-        .quality-label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #333;
-            font-size: 14px;
+        
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 10px 0;
         }
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 16px;
+            background: #f0f2f5;
+            border-radius: 40px;
+            transition: all 0.2s;
+        }
+        .radio-option.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .radio-option.selected .radio-label {
+            color: white;
+        }
+        .radio-input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+        .radio-label {
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            color: #555;
+        }
+        
         select {
             width: 100%;
             padding: 14px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             border: 2px solid #e0e0e0;
-            border-radius: 12px;
+            border-radius: 14px;
             font-size: 14px;
             background: white;
             cursor: pointer;
         }
+        
         button {
             width: 100%;
             padding: 14px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 12px;
+            border-radius: 14px;
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-        button:hover { transform: translateY(-2px); }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102,126,234,0.4); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        
         .progress-container {
-            margin-top: 20px;
+            margin-top: 25px;
             display: none;
         }
         .progress-container.show { display: block; }
         .progress-bar-wrapper {
-            background: #e0e0e0;
-            border-radius: 20px;
-            height: 30px;
+            background: #e8e8e8;
+            border-radius: 30px;
+            height: 32px;
             overflow: hidden;
         }
         .progress-fill {
@@ -103,11 +137,12 @@ HTML_TEMPLATE = '''
             font-size: 12px;
             font-weight: bold;
         }
-        .progress-text { margin-top: 8px; font-size: 12px; color: #666; text-align: center; }
+        .progress-text { margin-top: 10px; font-size: 13px; color: #555; text-align: center; }
+        
         .status {
             margin-top: 15px;
-            padding: 10px;
-            border-radius: 10px;
+            padding: 12px;
+            border-radius: 14px;
             display: none;
             text-align: center;
             font-size: 13px;
@@ -116,44 +151,136 @@ HTML_TEMPLATE = '''
         .loading { background: #e3f2fd; color: #1565c0; }
         .success { background: #d4edda; color: #155724; }
         .error { background: #ffebee; color: #c62828; }
+        
         .video-preview {
             margin-top: 20px;
-            padding: 15px;
+            padding: 20px;
             background: #f8f9fa;
-            border-radius: 16px;
+            border-radius: 20px;
             display: none;
             text-align: center;
+            animation: fadeIn 0.5s ease;
         }
         .video-preview.show { display: block; }
-        .video-preview img { max-width: 100%; border-radius: 12px; }
-        .video-preview h3 { font-size: 14px; margin: 8px 0; }
-        .info-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12px; }
-        .speed-badge {
-            background: #667eea;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .video-preview img { max-width: 100%; border-radius: 16px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .video-preview h3 { font-size: 18px; margin: 10px 0; color: #333; }
+        .info-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+        .info-badge {
+            background: #e8e8e8;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 12px;
+            color: #555;
+        }
+        .info-badge strong { color: #667eea; }
+        
+        .filename-preview {
+            margin-top: 15px;
+            padding: 12px;
+            background: #e8f0fe;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #333;
+            word-break: break-all;
+            text-align: left;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal.show {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 28px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .modal-content h3 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .modal-content p {
+            margin-bottom: 25px;
+            color: #666;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        .modal-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 40px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .modal-btn:hover { transform: translateY(-2px); }
+        .modal-btn.yes {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 4px 8px;
-            border-radius: 20px;
-            font-size: 11px;
-            margin-top: 8px;
-            display: inline-block;
+        }
+        .modal-btn.no {
+            background: #e0e0e0;
+            color: #555;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎬 YouTube Downloader</h1>
-        <div class="sub">Choose quality for faster downloads</div>
+        <div class="sub">Paste link → Select type & quality → Download</div>
         
-        <input type="text" id="url" placeholder="Paste YouTube URL here" value="https://youtu.be/hyYnjco6dHA">
+        <input type="text" id="url" placeholder="https://youtu.be/hyYnjco6dHA" value="https://youtu.be/hyYnjco6dHA">
         
-        <label class="quality-label">📹 Select Quality</label>
+        <div class="radio-group">
+            <label class="radio-option" id="videoOption">
+                <input type="radio" name="downloadType" value="video" class="radio-input" checked> 🎥 Video
+            </label>
+            <label class="radio-option" id="audioOption">
+                <input type="radio" name="downloadType" value="audio" class="radio-input"> 🎵 Audio Only
+            </label>
+        </div>
+        
         <select id="quality">
             <option value="best">🎬 Best Quality</option>
             <option value="1080p">📺 1080p Full HD</option>
             <option value="720p">📱 720p HD</option>
             <option value="480p">📱 480p</option>
-            <option value="360p">📱 360p (Fastest)</option>
-            <option value="audio">🎵 Audio Only</option>
+            <option value="360p">⚡ 360p (Fastest)</option>
         </select>
         
         <button id="downloadBtn">⬇️ Download Video</button>
@@ -168,6 +295,18 @@ HTML_TEMPLATE = '''
         <div id="status" class="status"></div>
         <div id="videoPreview" class="video-preview"></div>
     </div>
+    
+    <!-- Modal for "Download Another" -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h3>🎉 Download Complete!</h3>
+            <p>Your file has been saved to your Downloads folder.</p>
+            <div class="modal-buttons">
+                <button class="modal-btn yes" id="downloadAnotherBtn">✅ Download Another</button>
+                <button class="modal-btn no" id="closeModalBtn">❌ Close</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const urlInput = document.getElementById('url');
@@ -178,8 +317,71 @@ HTML_TEMPLATE = '''
         const progressFill = document.getElementById('progressFill');
         const progressText = document.getElementById('progressText');
         const videoPreview = document.getElementById('videoPreview');
+        const videoOption = document.getElementById('videoOption');
+        const audioOption = document.getElementById('audioOption');
+        const radioInputs = document.querySelectorAll('.radio-input');
+        const modal = document.getElementById('modal');
+        const downloadAnotherBtn = document.getElementById('downloadAnotherBtn');
+        const closeModalBtn = document.getElementById('closeModalBtn');
         
         let progressInterval = null;
+        let currentVideoInfo = null;
+        
+        // Modal functions
+        function showModal() {
+            modal.classList.add('show');
+        }
+        
+        function hideModal() {
+            modal.classList.remove('show');
+        }
+        
+        function resetForNewDownload() {
+            urlInput.value = '';
+            urlInput.focus();
+            videoPreview.classList.remove('show');
+            progressContainer.classList.remove('show');
+            statusDiv.className = 'status';
+            statusDiv.textContent = '';
+            updateProgress(0, 'Ready');
+        }
+        
+        downloadAnotherBtn.addEventListener('click', () => {
+            hideModal();
+            resetForNewDownload();
+        });
+        
+        closeModalBtn.addEventListener('click', () => {
+            hideModal();
+        });
+        
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideModal();
+            }
+        });
+        
+        // Radio button styling
+        radioInputs.forEach(radio => {
+            radio.addEventListener('change', function() {
+                document.querySelectorAll('.radio-option').forEach(opt => opt.classList.remove('selected'));
+                this.closest('.radio-option').classList.add('selected');
+                updateQualityOptions();
+                if (currentVideoInfo) updatePreviewWithType();
+            });
+        });
+        
+        function updateQualityOptions() {
+            const isAudio = getSelectedType() === 'audio';
+            qualitySelect.innerHTML = isAudio 
+                ? '<option value="audio">🎵 Best Audio (MP3)</option>'
+                : '<option value="best">🎬 Best Quality</option><option value="1080p">📺 1080p Full HD</option><option value="720p">📱 720p HD</option><option value="480p">📱 480p</option><option value="360p">⚡ 360p (Fastest)</option>';
+        }
+        
+        function getSelectedType() {
+            return document.querySelector('input[name="downloadType"]:checked').value;
+        }
         
         function showStatus(message, type) {
             statusDiv.textContent = message;
@@ -189,7 +391,7 @@ HTML_TEMPLATE = '''
                     statusDiv.className = 'status';
                     statusDiv.textContent = '';
                 }
-            }, 4000);
+            }, 5000);
         }
         
         function updateProgress(percentage, statusMsg) {
@@ -197,6 +399,17 @@ HTML_TEMPLATE = '''
             progressFill.style.width = percent + '%';
             progressFill.textContent = percent + '%';
             progressText.textContent = statusMsg;
+        }
+        
+        function updatePreviewWithType() {
+            if (!currentVideoInfo) return;
+            const isAudio = getSelectedType() === 'audio';
+            const fileType = isAudio ? '🎵 Audio File' : '🎬 Video File';
+            const extension = isAudio ? '.mp3' : '.mp4';
+            const filename = `${currentVideoInfo.title.replace(/[^\\w\\s]/gi, '')}${extension}`;
+            
+            const existingFilename = videoPreview.querySelector('.filename-preview');
+            if (existingFilename) existingFilename.innerHTML = `📁 <strong>Will save as:</strong> ${filename.substring(0, 60)}${filename.length > 60 ? '...' : ''}`;
         }
         
         function startProgressMonitoring(sessionId) {
@@ -207,7 +420,7 @@ HTML_TEMPLATE = '''
                     const data = await response.json();
                     if (data.percentage >= 100) {
                         updateProgress(100, 'Complete! Processing...');
-                        setTimeout(() => progressContainer.classList.remove('show'), 1000);
+                        setTimeout(() => progressContainer.classList.remove('show'), 1500);
                         if (progressInterval) clearInterval(progressInterval);
                     } else if (data.percentage > 0) {
                         updateProgress(data.percentage, data.status || 'Downloading...');
@@ -225,21 +438,35 @@ HTML_TEMPLATE = '''
                 });
                 if (response.ok) {
                     const info = await response.json();
+                    currentVideoInfo = info;
                     const videoId = url.split('v=')[1]?.split('&')[0] || url.split('youtu.be/')[1]?.split('?')[0];
+                    const isAudio = getSelectedType() === 'audio';
+                    const fileType = isAudio ? '🎵 Audio' : '🎬 Video';
+                    const extension = isAudio ? '.mp3' : '.mp4';
+                    const filename = `${info.title.replace(/[^\\w\\s]/gi, '')}${extension}`;
+                    
                     videoPreview.innerHTML = `
-                        <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg">
-                        <h3>${escapeHtml(info.title.substring(0, 50))}</h3>
-                        <div class="info-row"><span>⏱️ Duration:</span><span>${Math.floor(info.duration/60)}:${(info.duration%60).toString().padStart(2,'0')}</span></div>
-                        <div class="info-row"><span>👤 Uploader:</span><span>${escapeHtml(info.uploader)}</span></div>
+                        <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg" onerror="this.style.display='none'">
+                        <h3>${escapeHtml(info.title)}</h3>
+                        <div class="info-grid">
+                            <span class="info-badge">⏱️ ${Math.floor(info.duration/60)}:${(info.duration%60).toString().padStart(2,'0')}</span>
+                            <span class="info-badge">👤 ${escapeHtml(info.uploader)}</span>
+                            <span class="info-badge">📀 ${fileType}</span>
+                        </div>
+                        <div class="filename-preview">
+                            📁 <strong>Will save as:</strong> ${filename.substring(0, 70)}${filename.length > 70 ? '...' : ''}
+                        </div>
                     `;
                     videoPreview.classList.add('show');
                 }
-            } catch (e) {}
+            } catch (e) { console.log('Could not fetch video info'); }
         }
         
         downloadBtn.addEventListener('click', async () => {
             const url = urlInput.value.trim();
             const quality = qualitySelect.value;
+            const type = getSelectedType();
+            
             if (!url) { showStatus('Please enter a YouTube URL', 'error'); return; }
             
             progressContainer.classList.remove('show');
@@ -252,27 +479,36 @@ HTML_TEMPLATE = '''
             startProgressMonitoring(sessionId);
             progressContainer.classList.add('show');
             
-            const startTime = Date.now();
-            
             try {
                 const response = await fetch('/download', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: url, quality: quality, sessionId: sessionId })
+                    body: JSON.stringify({ url: url, quality: quality, type: type, sessionId: sessionId })
                 });
-                
-                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
                 
                 if (!response.ok) throw new Error('Download failed');
                 
                 const blob = await response.blob();
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'download.mp4';
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="(.+)"/);
+                    if (match) filename = match[1];
+                }
+                
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
-                a.download = 'video.mp4';
+                a.download = filename;
                 a.click();
                 URL.revokeObjectURL(a.href);
                 
-                showStatus(`✅ Complete! (${elapsed}s)`, 'success');
+                showStatus(`✅ ${type === 'audio' ? 'Audio' : 'Video'} downloaded!`, 'success');
+                
+                // Show the modal asking if they want to download another
+                setTimeout(() => {
+                    showModal();
+                }, 500);
+                
             } catch (error) {
                 showStatus('❌ Download failed. Make sure the video is public.', 'error');
                 progressContainer.classList.remove('show');
@@ -303,6 +539,7 @@ HTML_TEMPLATE = '''
         });
         
         setTimeout(() => fetchVideoInfo(urlInput.value.trim()), 500);
+        updateQualityOptions();
     </script>
 </body>
 </html>
@@ -328,9 +565,8 @@ def video_info():
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
     
-    # Faster info fetch with --no-playlist and --quiet
     cmd = f'yt-dlp --no-playlist --quiet --dump-json "{url}"'
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
     
     if result.returncode != 0:
         return jsonify({'error': 'Failed'}), 500
@@ -358,6 +594,7 @@ def download():
     data = request.get_json()
     url = data.get('url')
     quality = data.get('quality', 'best')
+    download_type = data.get('type', 'video')
     session_id = data.get('sessionId', str(int(time.time())))
     
     if not url:
@@ -367,20 +604,26 @@ def download():
     
     progress_data[session_id] = {'percentage': 0, 'status': 'Starting...'}
     
-    # Simplified format selectors for faster start
-    quality_map = {
-        'best': 'best[ext=mp4]/best',
-        '1080p': 'best[height<=1080][ext=mp4]/best[height<=1080]',
-        '720p': 'best[height<=720][ext=mp4]/best[height<=720]',
-        '480p': 'best[height<=480][ext=mp4]/best[height<=480]',
-        '360p': 'best[height<=360][ext=mp4]/best[height<=360]',
-        'audio': 'bestaudio[ext=m4a]/bestaudio'
-    }
+    # Get video title first for filename
+    title_cmd = f'yt-dlp --no-playlist --quiet --get-title "{url}"'
+    title_result = subprocess.run(title_cmd, shell=True, capture_output=True, text=True)
+    video_title = title_result.stdout.strip().replace('/', '-').replace('\\', '-')[:100]
     
-    format_spec = quality_map.get(quality, 'best[ext=mp4]/best')
-    
-    # Optimized command: --no-playlist --quiet --no-warnings for faster start
-    cmd = f'cd downloads && yt-dlp --no-playlist --quiet --no-warnings -f "{format_spec}" --progress "{url}"'
+    if download_type == 'audio':
+        format_spec = 'bestaudio/best'
+        output_ext = 'mp3'
+        cmd = f'cd downloads && yt-dlp --no-playlist --quiet --extract-audio --audio-format mp3 --audio-quality 0 -o "{video_title}.%(ext)s" "{url}"'
+    else:
+        quality_map = {
+            '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]',
+            '720p': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]',
+            '480p': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]',
+            '360p': 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]',
+            'best': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+        }
+        format_spec = quality_map.get(quality, 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best')
+        output_ext = 'mp4'
+        cmd = f'cd downloads && yt-dlp --no-playlist --quiet -f "{format_spec}" --merge-output-format mp4 -o "{video_title}.%(ext)s" "{url}"'
     
     process = subprocess.Popen(
         cmd,
@@ -393,6 +636,9 @@ def download():
     
     for line in process.stdout:
         parse_progress(line, session_id)
+        if 'Merging formats into' in line:
+            progress_data[session_id]['percentage'] = 95
+            progress_data[session_id]['status'] = 'Merging...'
     
     process.wait()
     
@@ -400,19 +646,27 @@ def download():
         return 'Download failed', 500
     
     files = os.listdir('downloads')
-    video_files = [f for f in files if f.endswith(('.mp4', '.mkv', '.m4a', '.mp3'))]
+    video_files = [f for f in files if f.endswith(('.mp4', '.mp3', '.m4a'))]
     
     if not video_files:
         return 'No file found', 500
     
     video_files.sort(key=lambda x: os.path.getctime(os.path.join('downloads', x)), reverse=True)
     file_path = os.path.join('downloads', video_files[0])
+    original_filename = video_files[0]
+    
+    # Create a clean filename
+    clean_filename = f"{video_title}.{output_ext}"
+    new_path = os.path.join('downloads', clean_filename)
+    if file_path != new_path and not os.path.exists(new_path):
+        os.rename(file_path, new_path)
+        file_path = new_path
     
     if session_id in progress_data:
         del progress_data[session_id]
     
-    return send_file(file_path, as_attachment=True)
+    return send_file(file_path, as_attachment=True, download_name=clean_filename)
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8000))
+    port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port, threaded=True)
